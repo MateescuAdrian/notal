@@ -1042,12 +1042,14 @@
         }
         ctx.stroke();
 
-        // === Cello Finger Badge Above Staff (with ↑ / ↓ vector arrow IN FRONT of finger number) ===
+        // === Cello Finger Badge Above Staff (level track with ↑ / ↓ vector arrow IN FRONT) ===
         const hasArrow = note.annotation.arrowPrefix.length > 0;
         const badgeW = hasArrow ? 38 : 26;
         const badgeH = 25;
-        const highestY = Math.min(staffTop - 10, stemUp ? cy - stemLen - 7 : cy - 14);
-        const badgeTop = highestY - badgeH - 3;
+        const defaultBadgeBottom = staffTop - 18;
+        const noteTopY = stemUp ? cy - stemLen : cy - 9;
+        const badgeBottom = Math.min(defaultBadgeBottom, noteTopY - 8);
+        const badgeTop = badgeBottom - badgeH;
         const badgeX = cx - badgeW / 2;
 
         ctx.fillStyle = isPlaying
@@ -1099,8 +1101,9 @@
         }
         ctx.textBaseline = "alphabetic";
 
-        // Below-staff Roman String + Pitch Label
-        const belowY = Math.max(staffBottom + 20, cy + 22);
+        // Below-staff Roman String + Pitch Label on level baseline
+        const noteBottomY = stemUp ? cy + 9 : cy + stemLen;
+        const belowY = Math.max(staffBottom + 22, noteBottomY + 15);
         ctx.fillStyle = strColor;
         ctx.font = "bold 10.5px Inter, system-ui, sans-serif";
         ctx.textAlign = "center";

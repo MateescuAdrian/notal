@@ -99,7 +99,7 @@ class CelloFingerboardView @JvmOverloads constructor(
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val w = MeasureSpec.getSize(widthMeasureSpec).coerceAtLeast(320)
-        setMeasuredDimension(w, dp(164f).roundToInt())
+        setMeasuredDimension(w, dp(138f).roundToInt())
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -118,10 +118,10 @@ class CelloFingerboardView @JvmOverloads constructor(
         canvas.drawRoundRect(frameRect, dp(16f), dp(16f), neckEdgePaint)
         neckEdgePaint.shader = null
 
-        boardLeft = dp(52f)
-        boardRight = w - dp(16f)
+        boardLeft = dp(56f)
+        boardRight = w - dp(14f)
         boardTop = dp(24f)
-        boardBottom = h - dp(18f)
+        boardBottom = h - dp(14f)
 
         // Ebony fingerboard surface
         val boardRect = RectF(boardLeft, boardTop, boardRight, boardBottom)
@@ -183,14 +183,14 @@ class CelloFingerboardView @JvmOverloads constructor(
             canvas.drawLine(nutX, sy, boardRight - dp(8f), sy, stringPaint)
         }
 
-        // Ghost dots for all score notes on fingerboard
+        // Ghost dots for all score notes on fingerboard (subtle so active stop stands out)
         val ghostPaint = Paint(Paint.ANTI_ALIAS_FLAG)
         for (n in scoreNotes) {
             val sIdx = stringOrder.indexOf(n.annotation.celloString).coerceAtLeast(0)
             val sy = boardTop + dp(10f) + sIdx * stringSpacing
             val sx = nutX + n.annotation.stringStopRatio * usableLen
-            ghostPaint.color = (n.annotation.celloString.colorHex and 0x00FFFFFF) or 0x55000000
-            canvas.drawCircle(sx, sy, dp(5.5f), ghostPaint)
+            ghostPaint.color = (n.annotation.celloString.colorHex and 0x00FFFFFF) or 0x38000000
+            canvas.drawCircle(sx, sy, dp(3.5f), ghostPaint)
         }
 
         // Active / Selected Note glowing stop marker with ↑/↓ + Finger Number

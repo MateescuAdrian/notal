@@ -197,9 +197,9 @@ class SheetScoreCanvasView @JvmOverloads constructor(
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val w = MeasureSpec.getSize(widthMeasureSpec).coerceAtLeast(320)
         val noteCount = score?.notes?.size ?: 0
-        val notesPerSystem = if (w > dp(520f)) 8 else 6
+        val notesPerSystem = if (w > dp(560f)) 8 else 4
         val systems = max(1, ceil(max(1, noteCount).toDouble() / notesPerSystem).toInt())
-        val desiredHeight = (dp(92f) + systems * dp(164f) + dp(28f)).roundToInt()
+        val desiredHeight = (dp(98f) + systems * dp(176f) + dp(18f)).roundToInt()
         setMeasuredDimension(w, desiredHeight)
     }
 
@@ -253,44 +253,30 @@ class SheetScoreCanvasView @JvmOverloads constructor(
         val secondaryInk = if (parchmentTheme) 0xFF6B5D4D.toInt() else 0xFFB7A894.toInt()
         val staffInk = if (parchmentTheme) 0xFF8C7B65.toInt() else 0xFF5D4D3E.toInt()
 
-        // Title & metadata header
+        // Title & concise metadata header
         headerTitlePaint.color = primaryInk
-        headerTitlePaint.textSize = sp(15.5f)
-        canvas.drawText(currentScore.title, dp(18f), dp(30f), headerTitlePaint)
+        headerTitlePaint.textSize = sp(16f)
+        canvas.drawText(currentScore.title, dp(22f), dp(33f), headerTitlePaint)
 
         headerSubPaint.color = secondaryInk
         headerSubPaint.textSize = sp(11.5f)
-        val metaLine = "${currentScore.composer}  •  ${currentScore.clef.label} (${currentScore.clef.symbol})  •  ${currentScore.keySignatureLabel}  •  ${activeInstrument.displayName} Fingerings"
-        canvas.drawText(metaLine, dp(18f), dp(49f), headerSubPaint)
+        val metaLine = "${currentScore.composer}  •  ${currentScore.clef.label} (${currentScore.clef.symbol})  •  ${currentScore.keySignatureLabel}"
+        canvas.drawText(metaLine, dp(22f), dp(52f), headerSubPaint)
 
-        // Touch mode indicator pill at top-right
-        val modeLabel = when (touchMode) {
-            TouchMode.AUDITION -> "Tap note: Play"
-            TouchMode.CYCLE_ACCIDENTAL -> "Tap note: ♮/♯/♭"
-            TouchMode.ADD_NOTE -> "Tap staff: +Note"
+        val dividerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (parchmentTheme) 0x338C7B65 else 0x33D4B483
+            strokeWidth = dp(1f)
         }
-        val modePillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = if (parchmentTheme) 0xFFEADBC0.toInt() else 0xFF2D231B.toInt()
-        }
-        val modeTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = if (parchmentTheme) 0xFF5A4018.toInt() else 0xFFE5A93C.toInt()
-            textSize = sp(10.5f)
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            textAlign = Paint.Align.RIGHT
-        }
-        val pillWidth = modeTextPaint.measureText(modeLabel) + dp(16f)
-        val pillRect = RectF(w - dp(16f) - pillWidth, dp(14f), w - dp(16f), dp(35f))
-        canvas.drawRoundRect(pillRect, dp(10f), dp(10f), modePillPaint)
-        canvas.drawText(modeLabel, pillRect.right - dp(8f), dp(28.5f), modeTextPaint)
+        canvas.drawLine(dp(22f), dp(66f), w - dp(22f), dp(66f), dividerPaint)
 
-        // Systems layout
+        // Systems layout (4 notes per system on portrait phones for uncrowded readability)
         val notes = currentScore.notes
-        val notesPerSystem = if (w > dp(520f)) 8 else 6
+        val notesPerSystem = if (w > dp(560f)) 8 else 4
         val systems = max(1, ceil(max(1, notes.size).toDouble() / notesPerSystem).toInt())
 
-        val lineGap = dp(10.5f)
+        val lineGap = dp(11.5f)
         val staffHeight = lineGap * 4f
-        val systemBlockHeight = dp(164f)
+        val systemBlockHeight = dp(176f)
         val startX = dp(20f)
         val endX = w - dp(20f)
 
@@ -298,7 +284,7 @@ class SheetScoreCanvasView @JvmOverloads constructor(
         barlinePaint.color = staffInk
 
         for (sys in 0 until systems) {
-            val staffTop = dp(108f) + sys * systemBlockHeight
+            val staffTop = dp(116f) + sys * systemBlockHeight
             val staffBottom = staffTop + staffHeight
 
             systemGeometries.add(
@@ -539,12 +525,13 @@ class SheetScoreCanvasView @JvmOverloads constructor(
             }
         }
 
-        // === CELLO FINGERING BADGE ABOVE STAFF (with vector ↑ / ↓ arrow IN FRONT of finger number) ===
+        // === CELLO FINGERING BADGE ABOVE STAFF (level horizontal track with ↑ / ↓ arrow IN FRONT) ===
         val hasArrow = note.annotation.arrowPrefix.isNotEmpty()
         val badgeW = if (hasArrow) dp(34f) else dp(24f)
         val badgeH = dp(23f)
-        val highestVisualY = min(staffTop - dp(8f), if (stemUp) cy - stemLen - dp(6f) else cy - dp(12f))
-        val badgeBottom = highestVisualY - dp(4f)
+        val defaultBadgeBottom = staffTop - dp(18f)
+        val noteTopY = if (stemUp) cy - stemLen else cy - dp(8f)
+        val badgeBottom = min(defaultBadgeBottom, noteTopY - dp(8f))
         val badgeTop = badgeBottom - badgeH
         val badgeRect = RectF(cx - badgeW / 2f, badgeTop, cx + badgeW / 2f, badgeBottom)
 
@@ -599,8 +586,9 @@ class SheetScoreCanvasView @JvmOverloads constructor(
             )
         }
 
-        // Below-staff Pitch + Roman String Label (e.g. "F♯3 • II")
-        val belowY = max(staffBottom + dp(18f), cy + dp(20f))
+        // Below-staff Pitch + Roman String Label on a level baseline
+        val noteBottomY = if (stemUp) cy + dp(8f) else cy + stemLen
+        val belowY = max(staffBottom + dp(20f), noteBottomY + dp(14f))
         subLabelPaint.color = stringColor
         subLabelPaint.textSize = sp(9.5f)
         subLabelPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)

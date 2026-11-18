@@ -9,6 +9,7 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
+import android.text.TextUtils
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
@@ -21,6 +22,9 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
@@ -52,21 +56,28 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var currentScore: SheetScore
 
-    // Views
+    // Core 3-Zone Views
     private lateinit var scoreCanvasView: SheetScoreCanvasView
     private lateinit var fingerboardView: CelloFingerboardView
-    private lateinit var detectionBannerText: TextView
-    private lateinit var detectionReasonText: TextView
+    private lateinit var instrumentStatusPill: TextView
+    private lateinit var repertoirePill: TextView
+    private lateinit var arrowRulePill: TextView
+    private lateinit var positionPill: TextView
+    private lateinit var touchModePill: TextView
+    private lateinit var themePill: TextView
     private lateinit var inspectorBadgeText: TextView
     private lateinit var inspectorTitleText: TextView
     private lateinit var inspectorDetailText: TextView
     private lateinit var playButton: MaterialButton
     private lateinit var loopButton: MaterialButton
     private lateinit var tempoValueText: TextView
-    private lateinit var playbackProgressText: TextView
-    private lateinit var arrowRuleBadgeText: TextView
-    private lateinit var addAccChipGroup: ChipGroup
-    private lateinit var instrumentChipGroup: ChipGroup
+
+    private val presetLabels = listOf(
+        "Bach BWV 1007",
+        "Saint-Saëns Swan",
+        "Dvořák ♯ & ♭ Study",
+        "Elgar Concerto"
+    )
 
     private val cameraPreviewLauncher =
         registerForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
@@ -82,7 +93,7 @@ class MainActivity : AppCompatActivity() {
             } else {
                 Toast.makeText(
                     this,
-                    "Camera permission denied — try Import Sheet Image or Scan Demo Sheet.",
+                    "Camera permission denied — choose Sheet Image or Optical Demo Scan.",
                     Toast.LENGTH_LONG
                 ).show()
             }
@@ -98,11 +109,23 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val samples = CelloFingeringEngine.getSampleScores(flatArrowStyle, positionMode, selectedInstrument)
+        val samples = CelloFingeringEngine.getSampleScores(
+            flatArrowStyle,
+            positionMode,
+            selectedInstrument
+        )
         currentScore = samples[0]
         tempoBpm = currentScore.defaultTempoBpm
 
-        setContentView(buildRootLayout())
+        val root = buildRootLayout()
+        setContentView(root)
+
+        ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            insets
+        }
+
         bindScoreToUi(triggerScan = false)
     }
 
@@ -117,10 +140,14 @@ class MainActivity : AppCompatActivity() {
         resources.displayMetrics
     ).toInt()
 
-    private fun cardBackground(fillColor: Int = 0xFF1B1511.toInt(), strokeColor: Int = 0xFF34281E.toInt()): GradientDrawable {
+    private fun roundedBg(
+        fillColor: Int = 0xFF1A1410.toInt(),
+        strokeColor: Int = 0xFF31261C.toInt(),
+        radiusDp: Int = 20
+    ): GradientDrawable {
         return GradientDrawable().apply {
             setColor(fillColor)
-            cornerRadius = dp(18).toFloat()
+            cornerRadius = dp(radiusDp).toFloat()
             setStroke(dp(1), strokeColor)
         }
     }
@@ -128,13 +155,18 @@ class MainActivity : AppCompatActivity() {
     private fun buildRootLayout(): View {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(0xFF0F0C0A.toInt())
+            setBackgroundColor(0xFF0E0B09.toInt())
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
             )
         }
 
+        // Zone 1: Sleek Top Bar + Single Quick-Control Strip
+        root.addView(buildTopHeader())
+        root.addView(buildQuickControlStrip())
+
+        // Scrollable Stage (Zone 2: Score Canvas + Zone 3: Unified Inspector & Fingerboard)
         val scrollView = ScrollView(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -144,362 +176,150 @@ class MainActivity : AppCompatActivity() {
             isVerticalScrollBarEnabled = false
         }
 
-        val content = LinearLayout(this).apply {
+        val stage = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(14), dp(14), dp(14), dp(18))
+            setPadding(dp(16), dp(8), dp(16), dp(18))
         }
 
-        content.addView(buildAtelierHeaderCard())
-        content.addView(spacer(10))
-        content.addView(buildInstrumentDetectCard())
-        content.addView(spacer(10))
-        content.addView(buildScoreControlsCard())
-        content.addView(spacer(10))
-
-        // Main Interactive Optical Music Sheet View
         scoreCanvasView = SheetScoreCanvasView(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             )
-            onNoteTapped = { idx, note ->
-                handleScoreNoteTapped(idx, note)
-            }
+            onNoteTapped = { idx, note -> handleScoreNoteTapped(idx, note) }
             onStaffTappedToAdd = { step, octave, insertIdx ->
                 handleAddNoteAtPitch(step, octave, addNoteAccidental, insertIdx)
             }
         }
-        content.addView(scoreCanvasView)
-        content.addView(spacer(10))
+        stage.addView(scoreCanvasView)
+        stage.addView(spacer(14))
+        stage.addView(buildUnifiedFingerboardCard())
 
-        content.addView(buildInspectorAndFingerboardCard())
-
-        scrollView.addView(content)
+        scrollView.addView(stage)
         root.addView(scrollView)
-        root.addView(buildTransportDock())
+
+        // Compact Single-Row Transport Bar
+        root.addView(buildCompactTransportBar())
         return root
     }
 
-    private fun buildAtelierHeaderCard(): View {
-        val card = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            background = cardBackground(0xFF1A1410.toInt(), 0xFF3E2E20.toInt())
-            setPadding(dp(14), dp(14), dp(14), dp(14))
-        }
-
-        val titleRow = LinearLayout(this).apply {
+    private fun buildTopHeader(): View {
+        val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(16), dp(12), dp(16), dp(8))
         }
 
-        val titleCol = LinearLayout(this).apply {
+        val leftCol = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
         }
-        titleCol.addView(TextView(this).apply {
-            text = "NOTAL  •  CELLO SCORE ATELIER"
-            textSize = 11.5f
-            setTextColor(0xFFE5A93C.toInt())
-            letterSpacing = 0.12f
-            setTypeface(null, Typeface.BOLD)
-        })
-        titleCol.addView(TextView(this).apply {
-            text = "Optical Sheet Scanner & Fingering Engraver"
-            textSize = 17.5f
+
+        leftCol.addView(TextView(this).apply {
+            text = "Notal"
+            textSize = 22f
             setTextColor(0xFFF6EFE2.toInt())
             setTypeface(Typeface.SERIF, Typeface.BOLD)
         })
 
-        val themeBtn = makeCompactButton("Parchment", 0xFF2B221A.toInt(), 0xFFE5A93C.toInt()).apply {
+        instrumentStatusPill = TextView(this).apply {
+            textSize = 12f
+            setTextColor(0xFFE5A93C.toInt())
+            setTypeface(null, Typeface.BOLD)
+            setPadding(0, dp(2), dp(8), dp(2))
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+            setOnClickListener { showStudioOptionsSheet() }
+        }
+        leftCol.addView(instrumentStatusPill)
+
+        val scanBtn = makeCompactButton("Scan", 0xFFE5A93C.toInt(), 0xFF120E0B.toInt()).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { marginEnd = dp(8) }
+            setOnClickListener { showScanOptionsSheet() }
+        }
+
+        val optionsBtn = makeCompactButton("Studio", 0xFF231B15.toInt(), 0xFFF6EFE2.toInt()).apply {
+            strokeColor = ColorStateList.valueOf(0xFF3E3024.toInt())
+            strokeWidth = dp(1)
+            setOnClickListener { showStudioOptionsSheet() }
+        }
+
+        header.addView(leftCol)
+        header.addView(scanBtn)
+        header.addView(optionsBtn)
+        return header
+    }
+
+    private fun buildQuickControlStrip(): View {
+        val scroll = HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            setPadding(dp(16), dp(2), dp(16), dp(8))
+            clipToPadding = false
+        }
+
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+        repertoirePill = makeStripPill("Bach BWV 1007 ▾", highlighted = true).apply {
+            setOnClickListener { showRepertoireSheet() }
+        }
+        arrowRulePill = makeStripPill("♯ → ↑  •  ♭ → ↓").apply {
+            setOnClickListener {
+                toggleFlatArrowStyle()
+            }
+        }
+        positionPill = makeStripPill("Pos: Auto").apply {
+            setOnClickListener { cyclePositionMode() }
+        }
+        touchModePill = makeStripPill("Tap: Play").apply {
+            setOnClickListener { cycleTouchMode() }
+        }
+        themePill = makeStripPill("Parchment").apply {
             setOnClickListener {
                 scoreCanvasView.parchmentTheme = !scoreCanvasView.parchmentTheme
                 text = if (scoreCanvasView.parchmentTheme) "Parchment" else "Midnight"
             }
         }
-        titleRow.addView(titleCol)
-        titleRow.addView(themeBtn)
-        card.addView(titleRow)
 
-        card.addView(spacer(10))
+        row.addView(repertoirePill)
+        row.addView(arrowRulePill)
+        row.addView(positionPill)
+        row.addView(touchModePill)
+        row.addView(themePill)
 
-        // Scanner Action Buttons Row
-        val actionRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-        }
-
-        val camBtn = makeCompactButton("Camera Scan", 0xFFE5A93C.toInt(), 0xFF120E0B.toInt()).apply {
-            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
-                marginEnd = dp(6)
-            }
-            setOnClickListener { launchCameraScanner() }
-        }
-        val imgBtn = makeCompactButton("Import Sheet", 0xFF2B221A.toInt(), 0xFFF6EFE2.toInt()).apply {
-            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
-                marginEnd = dp(6)
-            }
-            setOnClickListener { galleryImageLauncher.launch("image/*") }
-        }
-        val demoScanBtn = makeCompactButton("Optical Scan", 0xFF2D3A2E.toInt(), 0xFFA7F3D0.toInt()).apply {
-            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
-            setOnClickListener {
-                val rendered = SheetMusicScannerEngine.renderScoreToSampleBitmap(currentScore)
-                runOpticalScanOnBitmap(rendered, "Engraved Sheet OMR")
-            }
-        }
-
-        actionRow.addView(camBtn)
-        actionRow.addView(imgBtn)
-        actionRow.addView(demoScanBtn)
-        card.addView(actionRow)
-
-        return card
+        scroll.addView(row)
+        return scroll
     }
 
-    private fun buildInstrumentDetectCard(): View {
-        val card = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            background = cardBackground()
-            setPadding(dp(14), dp(12), dp(14), dp(12))
-        }
-
-        val topRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-
-        val textCol = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
-        }
-        detectionBannerText = TextView(this).apply {
-            textSize = 13.5f
-            setTextColor(0xFFF6EFE2.toInt())
+    private fun makeStripPill(label: String, highlighted: Boolean = false): TextView {
+        return TextView(this).apply {
+            text = label
+            textSize = 12f
             setTypeface(null, Typeface.BOLD)
-        }
-        detectionReasonText = TextView(this).apply {
-            textSize = 11.5f
-            setTextColor(0xFFB7A894.toInt())
-        }
-        textCol.addView(detectionBannerText)
-        textCol.addView(detectionReasonText)
-
-        val autoBtn = makeCompactButton("Auto-Detect", 0xFF2A2118.toInt(), 0xFFE5A93C.toInt()).apply {
-            setOnClickListener {
-                autoDetectLocked = true
-                val res = CelloFingeringEngine.autoDetectInstrument(currentScore.clef, currentScore.notes)
-                selectedInstrument = res.detectedInstrument
-                syncInstrumentChips()
-                currentScore = CelloFingeringEngine.reannotateScore(
-                    currentScore.copy(detectionResult = res),
-                    flatArrowStyle,
-                    positionMode,
-                    selectedInstrument
-                )
-                bindScoreToUi(triggerScan = true)
-            }
-        }
-        topRow.addView(textCol)
-        topRow.addView(autoBtn)
-        card.addView(topRow)
-
-        card.addView(spacer(6))
-
-        // Instrument Chips
-        val hScroll = HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false }
-        instrumentChipGroup = ChipGroup(this).apply {
-            isSingleSelection = true
-            isSelectionRequired = true
-        }
-        Instrument.entries.forEach { inst ->
-            val chip = createStyledChip(inst.displayName).apply {
-                id = View.generateViewId()
-                tag = inst
-                isChecked = inst == selectedInstrument
-                setOnClickListener {
-                    autoDetectLocked = false
-                    selectedInstrument = inst
-                    currentScore = CelloFingeringEngine.reannotateScore(
-                        currentScore,
-                        flatArrowStyle,
-                        positionMode,
-                        selectedInstrument
-                    )
-                    bindScoreToUi(triggerScan = false)
-                }
-            }
-            instrumentChipGroup.addView(chip)
-        }
-        hScroll.addView(instrumentChipGroup)
-        card.addView(hScroll)
-
-        return card
-    }
-
-    private fun buildScoreControlsCard(): View {
-        val card = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            background = cardBackground()
-            setPadding(dp(14), dp(12), dp(14), dp(12))
-        }
-
-        // Preset Scores row
-        card.addView(sectionLabel("REPERTOIRE & CHROMATIC STUDIES"))
-        val presetScroll = HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false }
-        val presetGroup = ChipGroup(this).apply {
-            isSingleSelection = true
-            isSelectionRequired = true
-        }
-        val presetTitles = listOf("Bach BWV 1007", "Saint-Saëns Swan", "Dvořák ♯ & ♭ Study", "Elgar Concerto")
-        presetTitles.forEachIndexed { idx, label ->
-            val chip = createStyledChip(label).apply {
-                id = View.generateViewId()
-                isChecked = idx == 0
-                setOnClickListener {
-                    synthesizer.stop()
-                    currentPresetIndex = idx
-                    val samples = CelloFingeringEngine.getSampleScores(
-                        flatArrowStyle, positionMode, selectedInstrument
-                    )
-                    currentScore = samples[idx]
-                    tempoBpm = currentScore.defaultTempoBpm
-                    if (autoDetectLocked) {
-                        selectedInstrument = currentScore.detectionResult.detectedInstrument
-                        syncInstrumentChips()
-                    }
-                    scoreCanvasView.scannedSourceBitmap = null
-                    scoreCanvasView.showScanBackdrop = false
-                    scoreCanvasView.selectedNoteIndex = 0
-                    bindScoreToUi(triggerScan = true)
-                }
-            }
-            presetGroup.addView(chip)
-        }
-        presetScroll.addView(presetGroup)
-        card.addView(presetScroll)
-
-        card.addView(spacer(8))
-
-        // Arrow Rule + Position Row
-        val ruleHeaderRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        ruleHeaderRow.addView(sectionLabel("ARROW NOTATION & POSITION").apply {
-            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
-        })
-        arrowRuleBadgeText = TextView(this).apply {
-            textSize = 11.5f
-            setTextColor(0xFFE5A93C.toInt())
-            setTypeface(null, Typeface.BOLD)
-        }
-        ruleHeaderRow.addView(arrowRuleBadgeText)
-        card.addView(ruleHeaderRow)
-
-        val ruleScroll = HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false }
-        val ruleRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-
-        val flatStyleBtn = makeCompactButton("♭ Arrow: ↓ (Toggle ↑)", 0xFF261F19.toInt(), 0xFF67E8F9.toInt()).apply {
+            setTextColor(if (highlighted) 0xFFE5A93C.toInt() else 0xFFE6DDD0.toInt())
+            background = roundedBg(
+                fillColor = if (highlighted) 0xFF281F16.toInt() else 0xFF1A1410.toInt(),
+                strokeColor = if (highlighted) 0xFF6B4F23.toInt() else 0xFF32261C.toInt(),
+                radiusDp = 99
+            )
+            setPadding(dp(13), dp(7), dp(13), dp(7))
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             ).apply { marginEnd = dp(8) }
-            setOnClickListener {
-                flatArrowStyle = if (flatArrowStyle == FlatArrowStyle.DOWN_ARROW) {
-                    FlatArrowStyle.UP_ARROW
-                } else {
-                    FlatArrowStyle.DOWN_ARROW
-                }
-                text = if (flatArrowStyle == FlatArrowStyle.DOWN_ARROW) {
-                    "♭ Arrow: ↓ (Tap for ↑)"
-                } else {
-                    "♭ Arrow: ↑ (Tap for ↓)"
-                }
-                reannotateCurrentScore()
-            }
         }
-        ruleRow.addView(flatStyleBtn)
-
-        val posGroup = ChipGroup(this).apply {
-            isSingleSelection = true
-            isSelectionRequired = true
-        }
-        CelloPositionMode.entries.forEach { pos ->
-            val chip = createStyledChip(pos.label).apply {
-                id = View.generateViewId()
-                isChecked = pos == positionMode
-                setOnClickListener {
-                    positionMode = pos
-                    reannotateCurrentScore()
-                }
-            }
-            posGroup.addView(chip)
-        }
-        ruleRow.addView(posGroup)
-        ruleScroll.addView(ruleRow)
-        card.addView(ruleScroll)
-
-        card.addView(spacer(8))
-
-        // Interactive Staff Editing & Quick Accidental Injector
-        card.addView(sectionLabel("INTERACTIVE SCORE EDITOR (WRITE FINGERS & ARROWS)"))
-        val editScroll = HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false }
-        val editRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-
-        val modeGroup = ChipGroup(this).apply {
-            isSingleSelection = true
-            isSelectionRequired = true
-        }
-        val modeOptions = listOf(
-            SheetScoreCanvasView.TouchMode.AUDITION to "Play Note",
-            SheetScoreCanvasView.TouchMode.CYCLE_ACCIDENTAL to "Tap Note: ♮/♯/♭",
-            SheetScoreCanvasView.TouchMode.ADD_NOTE to "Tap Staff: +Note"
-        )
-        modeOptions.forEachIndexed { idx, (mode, title) ->
-            modeGroup.addView(createStyledChip(title).apply {
-                id = View.generateViewId()
-                isChecked = idx == 0
-                setOnClickListener {
-                    scoreCanvasView.touchMode = mode
-                }
-            })
-        }
-        editRow.addView(modeGroup)
-
-        addAccChipGroup = ChipGroup(this).apply {
-            isSingleSelection = true
-            isSelectionRequired = true
-            setPadding(dp(8), 0, 0, 0)
-        }
-        listOf(
-            Accidental.SHARP to "+♯ (↑)",
-            Accidental.FLAT to "+♭ (↓/↑)",
-            Accidental.NONE to "+♮"
-        ).forEachIndexed { idx, (acc, label) ->
-            addAccChipGroup.addView(createStyledChip(label).apply {
-                id = View.generateViewId()
-                isChecked = idx == 0
-                setOnClickListener { addNoteAccidental = acc }
-            })
-        }
-        editRow.addView(addAccChipGroup)
-
-        editScroll.addView(editRow)
-        card.addView(editScroll)
-
-        return card
     }
 
-    private fun buildInspectorAndFingerboardCard(): View {
+    private fun buildUnifiedFingerboardCard(): View {
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            background = cardBackground()
-            setPadding(dp(14), dp(12), dp(14), dp(14))
+            background = roundedBg(0xFF17120E.toInt(), 0xFF31261C.toInt(), 20)
+            setPadding(dp(14), dp(14), dp(14), dp(14))
         }
 
         val infoRow = LinearLayout(this).apply {
@@ -508,15 +328,15 @@ class MainActivity : AppCompatActivity() {
         }
 
         inspectorBadgeText = TextView(this).apply {
-            textSize = 20f
+            textSize = 18f
             setTypeface(null, Typeface.BOLD)
-            setTextColor(0xFF140F0C.toInt())
+            setTextColor(0xFF120E0B.toInt())
             gravity = Gravity.CENTER
             background = GradientDrawable().apply {
                 setColor(0xFFE5A93C.toInt())
                 cornerRadius = dp(12).toFloat()
             }
-            layoutParams = LinearLayout.LayoutParams(dp(58), dp(46)).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(48), dp(40)).apply {
                 marginEnd = dp(12)
             }
         }
@@ -525,25 +345,28 @@ class MainActivity : AppCompatActivity() {
             orientation = LinearLayout.VERTICAL
             layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
         }
+
         inspectorTitleText = TextView(this).apply {
-            textSize = 14.5f
+            textSize = 14f
             setTextColor(0xFFF6EFE2.toInt())
             setTypeface(null, Typeface.BOLD)
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
         }
         inspectorDetailText = TextView(this).apply {
-            textSize = 12f
-            setTextColor(0xFFCBBBA4.toInt())
+            textSize = 11.5f
+            setTextColor(0xFFB7A894.toInt())
+            maxLines = 2
+            ellipsize = TextUtils.TruncateAt.END
         }
+
         textCol.addView(inspectorTitleText)
         textCol.addView(inspectorDetailText)
-
         infoRow.addView(inspectorBadgeText)
         infoRow.addView(textCol)
         card.addView(infoRow)
-
         card.addView(spacer(10))
 
-        card.addView(sectionLabel("INTERACTIVE CELLO FINGERBOARD (TAP STRING TO AUDITION)"))
         fingerboardView = CelloFingerboardView(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -569,69 +392,59 @@ class MainActivity : AppCompatActivity() {
         return card
     }
 
-    private fun buildTransportDock(): View {
-        val dock = LinearLayout(this).apply {
+    private fun buildCompactTransportBar(): View {
+        val wrapper = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(0xFF17120E.toInt())
-            setPadding(dp(14), dp(10), dp(14), dp(12))
+            setBackgroundColor(0xFF140F0C.toInt())
         }
 
-        val divider = View(this).apply {
-            setBackgroundColor(0xFF3A2D22.toInt())
+        wrapper.addView(View(this).apply {
+            setBackgroundColor(0xFF2E231A.toInt())
             layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(1))
-        }
-        dock.addView(divider)
-        dock.addView(spacer(8))
+        })
 
-        val topRow = LinearLayout(this).apply {
+        val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(14), dp(8), dp(14), dp(10))
         }
 
-        playButton = makeCompactButton("▶  Play Cello", 0xFFE5A93C.toInt(), 0xFF120E0B.toInt()).apply {
-            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.4f).apply {
-                marginEnd = dp(6)
-            }
+        playButton = makeCompactButton("▶ Play", 0xFFE5A93C.toInt(), 0xFF120E0B.toInt()).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { marginEnd = dp(6) }
             setOnClickListener { togglePlayback() }
         }
 
-        val stopButton = makeCompactButton("■ Stop", 0xFF2B221A.toInt(), 0xFFF6EFE2.toInt()).apply {
-            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 0.8f).apply {
-                marginEnd = dp(6)
-            }
+        val stopButton = makeCompactButton("■", 0xFF241C16.toInt(), 0xFFE8DFD1.toInt()).apply {
+            minWidth = dp(40)
+            setPadding(dp(10), dp(6), dp(10), dp(6))
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { marginEnd = dp(6) }
             setOnClickListener {
                 synthesizer.stop()
                 scoreCanvasView.playingNoteIndex = -1
-                playButton.text = "▶  Play Cello"
-                playbackProgressText.text = "Stopped"
+                playButton.text = "▶ Play"
             }
         }
 
-        loopButton = makeCompactButton("Loop: Off", 0xFF2B221A.toInt(), 0xFFB7A894.toInt()).apply {
-            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 0.9f)
+        loopButton = makeCompactButton("↻", 0xFF241C16.toInt(), 0xFF9F917E.toInt()).apply {
+            minWidth = dp(40)
+            setPadding(dp(10), dp(6), dp(10), dp(6))
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { marginEnd = dp(6) }
             setOnClickListener {
                 loopEnabled = !loopEnabled
-                text = if (loopEnabled) "Loop: On" else "Loop: Off"
-                setTextColor(if (loopEnabled) 0xFFE5A93C.toInt() else 0xFFB7A894.toInt())
+                backgroundTintList = ColorStateList.valueOf(
+                    if (loopEnabled) 0xFF3A2B16.toInt() else 0xFF241C16.toInt()
+                )
+                setTextColor(if (loopEnabled) 0xFFE5A93C.toInt() else 0xFF9F917E.toInt())
             }
-        }
-
-        topRow.addView(playButton)
-        topRow.addView(stopButton)
-        topRow.addView(loopButton)
-        dock.addView(topRow)
-
-        val tempoRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, dp(4), 0, 0)
-        }
-
-        tempoValueText = TextView(this).apply {
-            text = "Tempo: $tempoBpm BPM"
-            textSize = 11.5f
-            setTextColor(0xFFF6EFE2.toInt())
-            setTypeface(null, Typeface.BOLD)
         }
 
         val slider = Slider(this).apply {
@@ -639,39 +452,270 @@ class MainActivity : AppCompatActivity() {
             valueTo = 160f
             stepSize = 2f
             value = tempoBpm.toFloat().coerceIn(44f, 160f)
-            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
-                marginStart = dp(8)
-                marginEnd = dp(8)
-            }
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
             thumbTintList = ColorStateList.valueOf(0xFFE5A93C.toInt())
             trackActiveTintList = ColorStateList.valueOf(0xFFE5A93C.toInt())
-            trackInactiveTintList = ColorStateList.valueOf(0xFF3A2D22.toInt())
+            trackInactiveTintList = ColorStateList.valueOf(0xFF34281E.toInt())
             addOnChangeListener { _, v, _ ->
                 tempoBpm = v.toInt()
-                tempoValueText.text = "Tempo: $tempoBpm BPM"
+                tempoValueText.text = "$tempoBpm BPM"
             }
         }
 
-        playbackProgressText = TextView(this).apply {
-            text = "Ready"
+        tempoValueText = TextView(this).apply {
+            text = "$tempoBpm BPM"
             textSize = 11.5f
             setTextColor(0xFFE5A93C.toInt())
+            setTypeface(null, Typeface.BOLD)
+            setPadding(dp(4), 0, 0, 0)
         }
 
-        tempoRow.addView(tempoValueText)
-        tempoRow.addView(slider)
-        tempoRow.addView(playbackProgressText)
-        dock.addView(tempoRow)
+        row.addView(playButton)
+        row.addView(stopButton)
+        row.addView(loopButton)
+        row.addView(slider)
+        row.addView(tempoValueText)
+        wrapper.addView(row)
+        return wrapper
+    }
 
-        return dock
+    // =========================================================================
+    // BottomSheetDialogs for Clean, Uncrowded Controls
+    // =========================================================================
+
+    private fun showScanOptionsSheet() {
+        val dialog = BottomSheetDialog(this)
+        val container = createSheetContainer("Scan Music Sheet")
+
+        container.addView(TextView(this).apply {
+            text = "Scan printed or photographed sheet music to auto-detect the instrument and write Cello fingerings (↑ for ♯, ↓/↑ for ♭)."
+            textSize = 13f
+            setTextColor(0xFFB7A894.toInt())
+            setPadding(0, 0, 0, dp(14))
+        })
+
+        container.addView(makeSheetActionButton("Take Photo with Camera", 0xFFE5A93C.toInt(), 0xFF120E0B.toInt()) {
+            dialog.dismiss()
+            launchCameraScanner()
+        })
+        container.addView(spacer(10))
+        container.addView(makeSheetActionButton("Choose Sheet Image from Gallery", 0xFF282019.toInt(), 0xFFF6EFE2.toInt()) {
+            dialog.dismiss()
+            galleryImageLauncher.launch("image/*")
+        })
+        container.addView(spacer(10))
+        container.addView(makeSheetActionButton("Scan Built-in Manuscript (OMR Demo)", 0xFF223026.toInt(), 0xFFA7F3D0.toInt()) {
+            dialog.dismiss()
+            val rendered = SheetMusicScannerEngine.renderScoreToSampleBitmap(currentScore)
+            runOpticalScanOnBitmap(rendered, "Engraved Sheet OMR")
+        })
+
+        dialog.setContentView(container)
+        dialog.show()
+    }
+
+    private fun showRepertoireSheet() {
+        val dialog = BottomSheetDialog(this)
+        val container = createSheetContainer("Select Repertoire or Study")
+
+        presetLabels.forEachIndexed { idx, label ->
+            val isCurrent = idx == currentPresetIndex
+            val btn = makeSheetActionButton(
+                if (isCurrent) "✓  $label" else label,
+                if (isCurrent) 0xFFE5A93C.toInt() else 0xFF241C16.toInt(),
+                if (isCurrent) 0xFF120E0B.toInt() else 0xFFF6EFE2.toInt()
+            ) {
+                dialog.dismiss()
+                selectPreset(idx)
+            }
+            container.addView(btn)
+            if (idx < presetLabels.lastIndex) container.addView(spacer(8))
+        }
+
+        dialog.setContentView(container)
+        dialog.show()
+    }
+
+    private fun showStudioOptionsSheet() {
+        val dialog = BottomSheetDialog(this)
+        val container = createSheetContainer("Atelier & Fingering Settings")
+
+        // Instrument Detection & Override
+        container.addView(sheetSectionLabel("INSTRUMENT (AUTO-DETECT OR MANUAL)"))
+        val instGroup = ChipGroup(this).apply {
+            isSingleSelection = true
+            isSelectionRequired = true
+        }
+        Instrument.entries.forEach { inst ->
+            instGroup.addView(createStyledChip(inst.displayName).apply {
+                id = View.generateViewId()
+                isChecked = inst == selectedInstrument
+                setOnClickListener {
+                    autoDetectLocked = false
+                    selectedInstrument = inst
+                    reannotateCurrentScore()
+                }
+            })
+        }
+        container.addView(instGroup)
+        container.addView(spacer(8))
+        container.addView(makeSheetActionButton("Re-Run Instrument Auto-Detection", 0xFF261E18.toInt(), 0xFFE5A93C.toInt()) {
+            autoDetectLocked = true
+            val res = CelloFingeringEngine.autoDetectInstrument(currentScore.clef, currentScore.notes)
+            selectedInstrument = res.detectedInstrument
+            currentScore = CelloFingeringEngine.reannotateScore(
+                currentScore.copy(detectionResult = res),
+                flatArrowStyle,
+                positionMode,
+                selectedInstrument
+            )
+            bindScoreToUi(triggerScan = true)
+            dialog.dismiss()
+        })
+
+        container.addView(spacer(14))
+        container.addView(sheetSectionLabel("FLAT (♭) ARROW CONVENTION"))
+        val flatBtn = makeSheetActionButton(
+            if (flatArrowStyle == FlatArrowStyle.DOWN_ARROW) "Current: ♯ → ↑  &  ♭ → ↓  (Tap to use ↑ for both)"
+            else "Current: ♯ → ↑  &  ♭ → ↑  (Tap to use ↓ for ♭)",
+            0xFF261E18.toInt(),
+            0xFF67E8F9.toInt()
+        ) {
+            toggleFlatArrowStyle()
+            dialog.dismiss()
+        }
+        container.addView(flatBtn)
+
+        container.addView(spacer(14))
+        container.addView(sheetSectionLabel("CELLO POSITION MODE"))
+        val posGroup = ChipGroup(this).apply {
+            isSingleSelection = true
+            isSelectionRequired = true
+        }
+        CelloPositionMode.entries.forEach { pos ->
+            posGroup.addView(createStyledChip(pos.label).apply {
+                id = View.generateViewId()
+                isChecked = pos == positionMode
+                setOnClickListener {
+                    positionMode = pos
+                    reannotateCurrentScore()
+                }
+            })
+        }
+        container.addView(posGroup)
+
+        container.addView(spacer(14))
+        container.addView(sheetSectionLabel("TAP-TO-ADD ACCIDENTAL (IN '+NOTE' MODE)"))
+        val accGroup = ChipGroup(this).apply {
+            isSingleSelection = true
+            isSelectionRequired = true
+        }
+        listOf(
+            Accidental.SHARP to "+♯ (↑)",
+            Accidental.FLAT to "+♭ (↓/↑)",
+            Accidental.NONE to "+♮ Natural"
+        ).forEach { (acc, title) ->
+            accGroup.addView(createStyledChip(title).apply {
+                id = View.generateViewId()
+                isChecked = acc == addNoteAccidental
+                setOnClickListener { addNoteAccidental = acc }
+            })
+        }
+        container.addView(accGroup)
+
+        dialog.setContentView(container)
+        dialog.show()
+    }
+
+    private fun createSheetContainer(title: String): LinearLayout {
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(0xFF17120E.toInt())
+            setPadding(dp(20), dp(18), dp(20), dp(26))
+            addView(TextView(this@MainActivity).apply {
+                text = title
+                textSize = 18f
+                setTextColor(0xFFF6EFE2.toInt())
+                setTypeface(Typeface.SERIF, Typeface.BOLD)
+                setPadding(0, 0, 0, dp(10))
+            })
+        }
+    }
+
+    private fun makeSheetActionButton(
+        label: String,
+        bgColor: Int,
+        textColor: Int,
+        onClick: () -> Unit
+    ): MaterialButton {
+        return MaterialButton(this).apply {
+            text = label
+            isAllCaps = false
+            textSize = 13.5f
+            setTextColor(textColor)
+            backgroundTintList = ColorStateList.valueOf(bgColor)
+            cornerRadius = dp(14)
+            minHeight = dp(48)
+            gravity = Gravity.START or Gravity.CENTER_VERTICAL
+            setPadding(dp(16), dp(10), dp(16), dp(10))
+            setOnClickListener { onClick() }
+        }
+    }
+
+    // =========================================================================
+    // Actions & State Sync
+    // =========================================================================
+
+    private fun selectPreset(idx: Int) {
+        synthesizer.stop()
+        playButton.text = "▶ Play"
+        currentPresetIndex = idx
+        val samples = CelloFingeringEngine.getSampleScores(
+            flatArrowStyle,
+            positionMode,
+            selectedInstrument
+        )
+        currentScore = samples[idx]
+        tempoBpm = currentScore.defaultTempoBpm
+        if (autoDetectLocked) {
+            selectedInstrument = currentScore.detectionResult.detectedInstrument
+        }
+        scoreCanvasView.scannedSourceBitmap = null
+        scoreCanvasView.showScanBackdrop = false
+        scoreCanvasView.selectedNoteIndex = 0
+        bindScoreToUi(triggerScan = true)
+    }
+
+    private fun toggleFlatArrowStyle() {
+        flatArrowStyle = if (flatArrowStyle == FlatArrowStyle.DOWN_ARROW) {
+            FlatArrowStyle.UP_ARROW
+        } else {
+            FlatArrowStyle.DOWN_ARROW
+        }
+        reannotateCurrentScore()
+    }
+
+    private fun cyclePositionMode() {
+        val all = CelloPositionMode.entries
+        positionMode = all[(all.indexOf(positionMode) + 1) % all.size]
+        reannotateCurrentScore()
+    }
+
+    private fun cycleTouchMode() {
+        val all = SheetScoreCanvasView.TouchMode.entries
+        scoreCanvasView.touchMode = all[(all.indexOf(scoreCanvasView.touchMode) + 1) % all.size]
+        touchModePill.text = when (scoreCanvasView.touchMode) {
+            SheetScoreCanvasView.TouchMode.AUDITION -> "Tap: Play"
+            SheetScoreCanvasView.TouchMode.CYCLE_ACCIDENTAL -> "Tap: ♮/♯/♭"
+            SheetScoreCanvasView.TouchMode.ADD_NOTE -> "Tap Staff: +Note"
+        }
     }
 
     private fun togglePlayback() {
         if (synthesizer.isCurrentlyPlaying()) {
             synthesizer.stop()
             scoreCanvasView.playingNoteIndex = -1
-            playButton.text = "▶  Play Cello"
-            playbackProgressText.text = "Paused"
+            playButton.text = "▶ Play"
             return
         }
 
@@ -687,12 +731,10 @@ class MainActivity : AppCompatActivity() {
                     scoreCanvasView.selectedNoteIndex = idx
                     updateInspector(note)
                     fingerboardView.activeNote = note
-                    playbackProgressText.text = "${idx + 1}/${currentScore.notes.size} (${note.annotation.formattedLabel})"
                 }
             },
             onPlaybackComplete = {
-                playButton.text = "▶  Play Cello"
-                playbackProgressText.text = "Finished"
+                playButton.text = "▶ Play"
             }
         )
     }
@@ -782,19 +824,19 @@ class MainActivity : AppCompatActivity() {
 
     private fun runOpticalScanOnBitmap(bitmap: Bitmap, sourceLabel: String) {
         synthesizer.stop()
+        playButton.text = "▶ Play"
         Thread {
             val scanned = SheetMusicScannerEngine.scanBitmap(
                 bitmap = bitmap,
                 flatArrowStyle = flatArrowStyle,
                 positionMode = positionMode,
                 instrumentOverride = if (autoDetectLocked) null else selectedInstrument
-            ).copy(title = "$sourceLabel — Optical Cello Score")
+            ).copy(title = "$sourceLabel — Optical Score")
 
             runOnUiThread {
                 currentScore = scanned
                 if (autoDetectLocked) {
                     selectedInstrument = scanned.detectionResult.detectedInstrument
-                    syncInstrumentChips()
                 }
                 scoreCanvasView.scannedSourceBitmap = bitmap
                 scoreCanvasView.showScanBackdrop = true
@@ -816,14 +858,15 @@ class MainActivity : AppCompatActivity() {
 
     private fun bindScoreToUi(triggerScan: Boolean) {
         val det = currentScore.detectionResult
-        detectionBannerText.text = if (autoDetectLocked) {
-            "Auto-Detected: ${det.detectedInstrument.displayName} (${det.detectedInstrument.italianName}) • ${det.confidencePercent}%"
+        instrumentStatusPill.text = if (autoDetectLocked) {
+            "${currentScore.clef.symbol} ${det.detectedInstrument.displayName} (Auto ${det.confidencePercent}%) ▾"
         } else {
-            "Manual Instrument: ${selectedInstrument.displayName} (${selectedInstrument.rangeDescription})"
+            "${currentScore.clef.symbol} ${selectedInstrument.displayName} (Manual) ▾"
         }
-        detectionReasonText.text = det.reasoning
 
-        arrowRuleBadgeText.text = "♯ → ↑1..4   |   ♭ → ${flatArrowStyle.symbol}1..4"
+        repertoirePill.text = "${presetLabels.getOrElse(currentPresetIndex) { "Custom Scan" }} ▾"
+        arrowRulePill.text = "♯ → ↑  •  ♭ → ${flatArrowStyle.symbol}"
+        positionPill.text = "Pos: ${positionMode.shortCode}"
 
         scoreCanvasView.activeInstrument = selectedInstrument
         scoreCanvasView.score = currentScore
@@ -836,7 +879,6 @@ class MainActivity : AppCompatActivity() {
             updateInspector(active)
             fingerboardView.activeNote = active
         }
-        playbackProgressText.text = "${currentScore.notes.size} notes ready"
 
         if (triggerScan) {
             scoreCanvasView.triggerScanAnimation()
@@ -851,25 +893,18 @@ class MainActivity : AppCompatActivity() {
         inspectorDetailText.text = note.annotation.shiftDescription
     }
 
-    private fun syncInstrumentChips() {
-        for (i in 0 until instrumentChipGroup.childCount) {
-            val child = instrumentChipGroup.getChildAt(i) as? Chip ?: continue
-            child.isChecked = child.tag == selectedInstrument
-        }
-    }
-
     private fun makeCompactButton(label: String, bgColor: Int, textColor: Int): MaterialButton {
         return MaterialButton(this).apply {
             text = label
             isAllCaps = false
-            textSize = 12f
+            textSize = 12.5f
             setTextColor(textColor)
             backgroundTintList = ColorStateList.valueOf(bgColor)
-            cornerRadius = dp(12)
+            cornerRadius = dp(14)
             insetTop = 0
             insetBottom = 0
             minHeight = dp(38)
-            setPadding(dp(12), dp(6), dp(12), dp(6))
+            setPadding(dp(14), dp(6), dp(14), dp(6))
         }
     }
 
@@ -882,33 +917,32 @@ class MainActivity : AppCompatActivity() {
                 .setAllCornerSizes(dp(12).toFloat())
                 .build()
             chipStrokeWidth = dp(1).toFloat()
-            val bgStates = ColorStateList(
+            chipBackgroundColor = ColorStateList(
                 arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
                 intArrayOf(0xFFE5A93C.toInt(), 0xFF261E18.toInt())
             )
-            val txtStates = ColorStateList(
-                arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-                intArrayOf(0xFF120E0B.toInt(), 0xFFE8DFD1.toInt())
+            setTextColor(
+                ColorStateList(
+                    arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                    intArrayOf(0xFF120E0B.toInt(), 0xFFE8DFD1.toInt())
+                )
             )
-            val strokeStates = ColorStateList(
+            chipStrokeColor = ColorStateList(
                 arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
                 intArrayOf(0xFFF59E0B.toInt(), 0xFF423428.toInt())
             )
-            chipBackgroundColor = bgStates
-            setTextColor(txtStates)
-            chipStrokeColor = strokeStates
             isCheckedIconVisible = false
         }
     }
 
-    private fun sectionLabel(title: String): TextView {
+    private fun sheetSectionLabel(title: String): TextView {
         return TextView(this).apply {
             text = title
             textSize = 10.5f
             letterSpacing = 0.08f
             setTextColor(0xFFB7A894.toInt())
             setTypeface(null, Typeface.BOLD)
-            setPadding(0, 0, 0, dp(4))
+            setPadding(0, 0, 0, dp(6))
         }
     }
 
