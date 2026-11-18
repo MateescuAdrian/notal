@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Notal — Optical Music Sheet Scanner, Cello Fingering Engraver &amp; Player</title>
+  <meta
+    name="description"
+    content="Scan music sheets, auto-detect instruments, engrave Cello finger numbers with ↑ arrows in front for # and ↓/↑ arrows for b, and play back with synthesized bowed cello audio."
+  />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="#top" class="brand">
+        <svg class="brand-mark" viewBox="0 0 44 44" aria-hidden="true">
+          <rect width="44" height="44" rx="11" fill="#1E1712" stroke="#E5A93C" stroke-width="1.5" />
+          <path d="M9 15h26M9 21h26M9 27h26M9 33h26" stroke="#6E5A44" stroke-width="1.2" />
+          <ellipse cx="20" cy="27" rx="5" ry="3.5" transform="rotate(-18 20 27)" fill="#FBF6EB" />
+          <path d="M24 12v15" stroke="#E5A93C" stroke-width="2" stroke-linecap="round" />
+          <path d="M20 5l-3.5 4.5h2.2V14h2.6V9.5h2.2z" fill="#E5A93C" />
+        </svg>
+        <span class="brand-text">
+          <strong>Notal</strong>
+          <span>Cello Score Atelier</span>
+        </span>
+      </a>
+
+      <nav class="site-nav" aria-label="Primary navigation">
+        <a href="#studio">Scanner Studio</a>
+        <a href="#arrow-guide">♯ / ♭ Arrow Guide</a>
+        <a href="#android-app">Android App</a>
+      </nav>
+
+      <div class="header-actions">
+        <label class="btn btn-primary" for="sheet-file-input">Scan Sheet Image</label>
+      </div>
+    </div>
+  </header>
+
+  <main id="top">
+    <!-- Hero -->
+    <section class="hero">
+      <div class="container hero-grid">
+        <div class="hero-copy">
+          <p class="eyebrow">Optical Music Recognition • Cello Luthiery Engine</p>
+          <h1>Scan sheet music. Engrave every <span class="accent">↑</span> &amp; <span class="accent">↓</span> cello fingering. Hear it bowed.</h1>
+          <p class="lead">
+            Notal scans photographed or uploaded sheet music, auto-detects the instrument and clef,
+            writes color-coded Cello finger numbers directly above the staff—placing a crisp little
+            <strong>↑ up-arrow in front</strong> for sharps (<code>♯ → ↑3</code>) and a matching
+            <strong>↓ / ↑ arrow in front</strong> for flats (<code>♭ → ↓1</code>)—and plays the
+            score through a warm harmonic bowed-cello synthesizer.
+          </p>
+          <div class="hero-cta-row">
+            <a href="#studio" class="btn btn-primary">Open Interactive Studio</a>
+            <button type="button" class="btn btn-secondary" id="hero-dvorak-btn">Load ♯ &amp; ♭ Study</button>
+            <button type="button" class="btn btn-ghost" id="hero-play-btn">▶ Play Preview</button>
+          </div>
+          <dl class="hero-metrics">
+            <div>
+              <dt>Sharp Rule (♯)</dt>
+              <dd><code>↑1</code> <code>↑2</code> <code>↑3</code> <code>↑4</code></dd>
+            </div>
+            <div>
+              <dt>Flat Rule (♭)</dt>
+              <dd><code>↓1</code> <code>↓2</code> or <code>↑1</code></dd>
+            </div>
+            <div>
+              <dt>Strings</dt>
+              <dd>C₂ • G₂ • D₃ • A₃</dd>
+            </div>
+          </dl>
+        </div>
+
+        <aside class="hero-showcase" aria-label="Live notation preview">
+          <div class="showcase-card">
+            <div class="showcase-top">
+              <span class="pill pill-gold">Auto-Detected: Violoncello (98%)</span>
+              <span class="pill pill-muted">Bass Clef 𝄢</span>
+            </div>
+            <div class="mini-notation">
+              <div class="mini-note">
+                <span class="finger-chip str-d"><span class="arr-up">↑</span>3</span>
+                <span class="note-glyph">♯F3</span>
+                <span class="note-desc">II • D string</span>
+              </div>
+              <div class="mini-note">
+                <span class="finger-chip str-a"><span class="arr-dn">↓</span>1</span>
+                <span class="note-glyph">♭B3</span>
+                <span class="note-desc">I • A string</span>
+              </div>
+              <div class="mini-note">
+                <span class="finger-chip str-g"><span class="arr-up">↑</span>4</span>
+                <span class="note-glyph">♯C3</span>
+                <span class="note-desc">III • G string</span>
+              </div>
+              <div class="mini-note">
+                <span class="finger-chip str-c">0</span>
+                <span class="note-glyph">C2</span>
+                <span class="note-desc">IV • Open</span>
+              </div>
+            </div>
+            <p class="showcase-caption">
+              Vector-drawn arrows sit directly in front of every sharp and flat finger number so
+              accidental extensions are readable at rehearsal distance.
+            </p>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- Interactive Optical Scanner & Cello Studio -->
+    <section id="studio" class="studio-section">
+      <div class="container">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Live Web Studio</p>
+            <h2>Optical Sheet Scanner &amp; Cello Fingering Engraver</h2>
+          </div>
+          <p class="section-note">
+            Upload a sheet photo, capture from camera, or click notes directly on the manuscript to edit accidentals and hear bowed playback.
+          </p>
+        </div>
+
+        <div class="studio-shell">
+          <!-- Scanner & Drop Zone Bar -->
+          <div class="scanner-toolbar" id="drop-zone">
+            <div class="scanner-inputs">
+              <input type="file" id="sheet-file-input" accept="image/*" hidden />
+              <label for="sheet-file-input" class="btn btn-primary">Upload Sheet Image</label>
+              <button type="button" class="btn btn-secondary" id="open-camera-btn">Camera Scan</button>
+              <button type="button" class="btn btn-secondary" id="run-omr-btn">Run Optical Scan</button>
+              <button type="button" class="btn btn-ghost" id="export-png-btn">Export PNG</button>
+            </div>
+
+            <div class="preset-group" role="group" aria-label="Sample scores">
+              <button type="button" class="chip is-active" data-preset="bach_prelude">Bach BWV 1007</button>
+              <button type="button" class="chip" data-preset="saint_saens_swan">Saint-Saëns Swan</button>
+              <button type="button" class="chip" data-preset="dvorak_chromatic">Dvořák ♯ &amp; ♭ Study</button>
+              <button type="button" class="chip" data-preset="elgar_concerto">Elgar Concerto</button>
+              <button type="button" class="chip" data-preset="blank_staff">Custom Staff</button>
+            </div>
+          </div>
+
+          <!-- Instrument Auto-Detect & Fingering Convention Controls -->
+          <div class="controls-bar">
+            <div class="control-cluster">
+              <span class="cluster-label">Instrument Detection</span>
+              <div class="cluster-row">
+                <button type="button" class="chip is-active" id="auto-detect-btn">Auto-Detect</button>
+                <span class="detection-readout" id="detection-readout">
+                  Violoncello • 98% • Bass Clef 𝄢
+                </span>
+              </div>
+              <div class="cluster-row" role="group" aria-label="Manual instrument override" id="instrument-group">
+                <button type="button" class="chip is-active" data-instrument="CELLO">Cello</button>
+                <button type="button" class="chip" data-instrument="VIOLIN">Violin</button>
+                <button type="button" class="chip" data-instrument="VIOLA">Viola</button>
+                <button type="button" class="chip" data-instrument="DOUBLE_BASS">Double Bass</button>
+              </div>
+            </div>
+
+            <div class="control-cluster">
+              <span class="cluster-label">Arrow Rule &amp; Cello Position</span>
+              <div class="cluster-row">
+                <button type="button" class="chip is-active" id="flat-arrow-toggle" title="Toggle flat accidental arrow direction">
+                  ♯ → ↑ &amp; ♭ → ↓
+                </button>
+                <button type="button" class="chip" id="theme-toggle-btn">Theme: Parchment</button>
+                <button type="button" class="chip" id="backdrop-toggle-btn" hidden>Show Scan Photo</button>
+              </div>
+              <div class="cluster-row" role="group" aria-label="Cello position mode" id="position-group">
+                <button type="button" class="chip is-active" data-position="AUTO">Auto Optimal</button>
+                <button type="button" class="chip" data-position="FIRST">1st Pos</button>
+                <button type="button" class="chip" data-position="EXTENDED_FIRST">Ext 1st</button>
+                <button type="button" class="chip" data-position="FOURTH">4th Pos</button>
+              </div>
+            </div>
+
+            <div class="control-cluster">
+              <span class="cluster-label">Interactive Score Editor</span>
+              <div class="cluster-row" role="group" aria-label="Canvas tap behavior" id="edit-mode-group">
+                <button type="button" class="chip is-active" data-mode="AUDITION">Click Note: Play</button>
+                <button type="button" class="chip" data-mode="CYCLE_ACCIDENTAL">Click Note: ♮/♯/♭</button>
+                <button type="button" class="chip" data-mode="ADD_NOTE">Click Staff: +Note</button>
+              </div>
+              <div class="cluster-row" role="group" aria-label="New note accidental" id="add-acc-group">
+                <button type="button" class="chip is-active" data-acc="SHARP">+♯ (↑)</button>
+                <button type="button" class="chip" data-acc="FLAT">+♭ (↓/↑)</button>
+                <button type="button" class="chip" data-acc="NONE">+♮</button>
+                <button type="button" class="chip" id="undo-note-btn">Remove Last</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Main Studio Workspace (Container Queried) -->
+          <div class="workspace-container">
+            <div class="workspace-grid">
+              <div class="score-panel">
+                <div class="canvas-wrap">
+                  <canvas id="score-canvas" width="960" height="440" aria-label="Interactive musical score with cello fingerings"></canvas>
+                </div>
+              </div>
+
+              <aside class="inspector-panel">
+                <div class="note-inspector-card">
+                  <div class="inspector-badge" id="inspector-badge">↑3</div>
+                  <div class="inspector-copy">
+                    <h3 id="inspector-title">F♯3 • String II (D3) • 1st Pos</h3>
+                    <p id="inspector-desc">
+                      Sharp (♯): Little ↑ up-arrow placed in front of Finger 3 — raise ½ step on D string.
+                    </p>
+                  </div>
+                </div>
+
+                <div class="fingerboard-wrap">
+                  <div class="fingerboard-head">
+                    <span>4-String Cello Fingerboard (Tap to audition)</span>
+                    <span class="string-legend">
+                      <i class="dot str-a"></i>I A
+                      <i class="dot str-d"></i>II D
+                      <i class="dot str-g"></i>III G
+                      <i class="dot str-c"></i>IV C
+                    </span>
+                  </div>
+                  <canvas id="fingerboard-canvas" width="520" height="220" aria-label="Interactive cello fingerboard"></canvas>
+                </div>
+
+                <div class="scan-status-log" id="scan-status-log">
+                  Ready — Load a sheet image, click staff lines to write notes, or press Play.
+                </div>
+              </aside>
+            </div>
+          </div>
+
+          <!-- Audio Transport Bar -->
+          <div class="transport-bar">
+            <div class="transport-buttons">
+              <button type="button" class="btn btn-primary" id="play-btn">▶ Play Bowed Cello</button>
+              <button type="button" class="btn btn-secondary" id="stop-btn">■ Stop</button>
+              <button type="button" class="chip" id="loop-btn">Loop: Off</button>
+              <button type="button" class="chip" id="metronome-btn">Metronome: Off</button>
+            </div>
+
+            <div class="transport-sliders">
+              <label class="slider-field">
+                <span>Tempo <strong id="tempo-readout">76 BPM</strong></span>
+                <input type="range" id="tempo-slider" min="44" max="176" step="2" value="76" />
+              </label>
+              <label class="slider-field">
+                <span>Volume <strong id="volume-readout">85%</strong></span>
+                <input type="range" id="volume-slider" min="0" max="100" step="5" value="85" />
+              </label>
+            </div>
+
+            <div class="playback-counter" id="playback-counter">Note 1 / 16</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Pedagogical Arrow & Cello String Guide -->
+    <section id="arrow-guide" class="guide-section">
+      <div class="container">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Fingering Grammar</p>
+            <h2>Why ↑ and ↓ Arrows Sit in Front of Finger Numbers</h2>
+          </div>
+        </div>
+
+        <div class="card-grid">
+          <article class="info-card">
+            <div class="card-badge str-d">↑1 • ↑2 • ↑3 • ↑4</div>
+            <h3>Sharps (♯): Little Up Arrow in Front</h3>
+            <p>
+              Whenever a note carries a sharp (<code>♯</code>), Notal writes a sharp-contrast
+              little up arrow <strong>in front of</strong> the finger number (such as
+              <code>↑3</code> for F♯3 on the D string or <code>↑1</code> for C♯2 on the C string),
+              signaling a half-step upward extension.
+            </p>
+          </article>
+
+          <article class="info-card">
+            <div class="card-badge str-a">↓1 • ↓2 / ↑1 • ↑2</div>
+            <h3>Flats (♭): Flexible Arrow Convention</h3>
+            <p>
+              For flats (<code>♭</code>), Notal places a downward arrow in front of the finger
+              number by default (e.g. <code>↓1</code> for B♭3 on A string or <code>↓2</code> for
+              E♭2 on C string), and provides a 1-tap convention toggle so players who prefer
+              <code>↑</code> for both <code>♯</code> and <code>♭</code> can switch instantaneously.
+            </p>
+          </article>
+
+          <article class="info-card">
+            <div class="card-badge str-g">C₂ • G₂ • D₃ • A₃</div>
+            <h3>Optical Scan &amp; Auto-Detection</h3>
+            <p>
+              Our horizontal luminance projection detector locks onto the five staff lines,
+              clusters dark elliptical noteheads and left-adjacent accidentals, identifies Bass
+              (<code>𝄢</code>), Tenor (<code>𝄡</code>), or Treble (<code>𝄞</code>) clef range,
+              and maps each pitch to an ergonomic cello string and position.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Android App Companion Showcase -->
+    <section id="android-app" class="android-section">
+      <div class="container android-grid">
+        <div class="android-copy">
+          <p class="eyebrow">Native Android Companion</p>
+          <h2>Built for Rehearsal Stands &amp; Practice Rooms</h2>
+          <p>
+            The companion Android application (<code>com.notal.atelier</code>) runs completely
+            on-device in Kotlin with custom hardware-accelerated Canvas engraving, Android
+            Camera &amp; Gallery sheet scanning, interactive 4-string Cello fingerboard touch
+            auditioning, and a low-latency <code>AudioTrack</code> bowed-cello PCM synthesizer.
+          </p>
+          <ul class="feature-list">
+            <li>Camera capture &amp; Gallery photo import with animated optical laser scan overlay</li>
+            <li>Auto-detects Cello, Violin, Viola, or Double Bass with manual override chips</li>
+            <li>Vector-drawn <code>↑</code> &amp; <code>↓</code> arrows positioned directly before finger numbers</li>
+            <li>Tap any note to toggle <code>♮ / ♯ / ♭</code> or tap staff lines to compose new phrases</li>
+          </ul>
+        </div>
+
+        <div class="phone-mockup" aria-label="Android app visual preview">
+          <div class="phone-screen">
+            <div class="phone-bar">
+              <span>NOTAL ATELIER</span>
+              <span>98% CELLO</span>
+            </div>
+            <div class="phone-score-preview">
+              <div class="phone-staff-lines"></div>
+              <div class="phone-badges">
+                <span class="p-badge str-g">0</span>
+                <span class="p-badge str-d">0</span>
+                <span class="p-badge str-a">1</span>
+                <span class="p-badge str-d">↑3</span>
+                <span class="p-badge str-a">↓1</span>
+                <span class="p-badge str-g">↑4</span>
+              </div>
+            </div>
+            <div class="phone-fb-preview">
+              <span class="fb-str s1">I A</span>
+              <span class="fb-str s2">II D</span>
+              <span class="fb-str s3">III G</span>
+              <span class="fb-str s4">IV C</span>
+            </div>
+            <div class="phone-dock">
+              <span class="dock-play">▶ Play Cello</span>
+              <span>76 BPM</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <p>Notal Atelier — Optical Music Sheet Scanner, Cello Fingering Annotator &amp; Bowed Synthesizer.</p>
+      <p>Works fully offline in modern browsers &amp; Android (API 26+).</p>
+    </div>
+  </footer>
+
+  <!-- Modal Dialog for Live Camera Sheet Scan -->
+  <dialog id="camera-dialog" class="camera-dialog" aria-labelledby="camera-dialog-title">
+    <div class="dialog-header">
+      <h3 id="camera-dialog-title">Camera Sheet Scanner</h3>
+      <button type="button" class="btn btn-ghost" id="close-camera-btn">Close</button>
+    </div>
+    <div class="camera-stage">
+      <video id="camera-video" autoplay playsinline muted></video>
+      <div class="camera-guides" aria-hidden="true">
+        <span>Align 5-line music staff inside frame</span>
+      </div>
+    </div>
+    <p class="camera-error" id="camera-error" hidden></p>
+    <div class="dialog-actions">
+      <button type="button" class="btn btn-primary" id="capture-scan-btn">Capture &amp; Annotate Cello Fingers</button>
+    </div>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>

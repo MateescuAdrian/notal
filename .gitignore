@@ -1,0 +1,13 @@
+# Android / Gradle build & local config artifacts
+android/.gradle/
+android/.kotlin/
+android/build/
+android/app/build/
+android/local.properties
+*.iml
+.idea/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+*~

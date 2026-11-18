@@ -1,0 +1,12 @@
+<resources>
+    <style name="Theme.NotalAtelier" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">@color/varnish_gold</item>
+        <item name="colorOnPrimary">@color/ebony_deep</item>
+        <item name="colorSecondary">@color/rosin_amber</item>
+        <item name="android:colorBackground">@color/ebony_deep</item>
+        <item name="android:statusBarColor">@color/ebony_deep</item>
+        <item name="android:navigationBarColor">@color/ebony_deep</item>
+        <item name="android:textColorPrimary">@color/ivory_text</item>
+        <item name="android:textColorSecondary">@color/muted_sepia</item>
+    </style>
+</resources>
