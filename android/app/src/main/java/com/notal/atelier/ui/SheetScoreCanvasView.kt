@@ -13,6 +13,7 @@ import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.Typeface
 import android.util.AttributeSet
+import android.util.TypedValue
 import android.view.MotionEvent
 import android.view.View
 import android.view.animation.AccelerateDecelerateInterpolator
@@ -171,7 +172,11 @@ class SheetScoreCanvasView @JvmOverloads constructor(
     }
 
     private fun dp(v: Float): Float = v * resources.displayMetrics.density
-    private fun sp(v: Float): Float = v * resources.displayMetrics.scaledDensity
+    private fun sp(v: Float): Float = TypedValue.applyDimension(
+        TypedValue.COMPLEX_UNIT_SP,
+        v,
+        resources.displayMetrics
+    )
 
     fun triggerScanAnimation() {
         scanAnimator?.cancel()

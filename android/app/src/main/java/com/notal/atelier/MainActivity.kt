@@ -878,7 +878,9 @@ class MainActivity : AppCompatActivity() {
             text = label
             isCheckable = true
             textSize = 12f
-            chipCornerRadius = dp(12).toFloat()
+            shapeAppearanceModel = shapeAppearanceModel.toBuilder()
+                .setAllCornerSizes(dp(12).toFloat())
+                .build()
             chipStrokeWidth = dp(1).toFloat()
             val bgStates = ColorStateList(
                 arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
